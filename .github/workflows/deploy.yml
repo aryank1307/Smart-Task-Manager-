@@ -1,0 +1,83 @@
+name: Build And Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  docker-build-push-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-task-manager-backend
+      FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/smart-task-manager-frontend
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_URL=${{ secrets.FRONTEND_API_URL }}
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+
+      - name: Deploy to EC2 over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            docker pull ${{ env.BACKEND_IMAGE }}:latest
+            docker pull ${{ env.FRONTEND_IMAGE }}:latest
+
+            docker network create stm-net || true
+
+            docker rm -f stm-backend || true
+            docker rm -f stm-frontend || true
+
+            docker run -d --name stm-backend \
+              --network stm-net \
+              -p ${{ secrets.BACKEND_PORT }}:5000 \
+              --restart unless-stopped \
+              -e PORT=5000 \
+              -e MONGO_URI='${{ secrets.MONGO_URI }}' \
+              -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+              -e CLIENT_URL='${{ secrets.FRONTEND_BASE_URL }}' \
+              ${{ env.BACKEND_IMAGE }}:latest
+
+            docker run -d --name stm-frontend \
+              --network stm-net \
+              -p ${{ secrets.FRONTEND_PORT }}:80 \
+              --restart unless-stopped \
+              ${{ env.FRONTEND_IMAGE }}:latest
