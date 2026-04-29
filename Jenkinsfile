@@ -45,12 +45,19 @@ pipeline {
           bat '''
             @echo off
             echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+            if errorlevel 1 exit /b %errorlevel%
             docker push %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG%
+            if errorlevel 1 exit /b %errorlevel%
             docker tag %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG% %DOCKERHUB_REPO_BACKEND%:latest
+            if errorlevel 1 exit /b %errorlevel%
             docker push %DOCKERHUB_REPO_BACKEND%:latest
+            if errorlevel 1 exit /b %errorlevel%
             docker push %DOCKERHUB_REPO_FRONTEND%:%IMAGE_TAG%
+            if errorlevel 1 exit /b %errorlevel%
             docker tag %DOCKERHUB_REPO_FRONTEND%:%IMAGE_TAG% %DOCKERHUB_REPO_FRONTEND%:latest
+            if errorlevel 1 exit /b %errorlevel%
             docker push %DOCKERHUB_REPO_FRONTEND%:latest
+            if errorlevel 1 exit /b %errorlevel%
             docker logout
           '''
         }
@@ -79,13 +86,13 @@ pipeline {
             $mysqlDbB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MYSQL_DATABASE))
             $jwtB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:JWT_SECRET))
 
-            $remote = @"
+            $remote = @'
 set -e
-MYSQL_HOST=$(printf '%s' '$mysqlHostB64' | base64 -d)
-MYSQL_USER=$(printf '%s' '$mysqlUserB64' | base64 -d)
-MYSQL_PASSWORD=$(printf '%s' '$mysqlPasswordB64' | base64 -d)
-MYSQL_DATABASE=$(printf '%s' '$mysqlDbB64' | base64 -d)
-JWT_SECRET=$(printf '%s' '$jwtB64' | base64 -d)
+MYSQL_HOST=$(printf '%s' '__MYSQL_HOST_B64__' | base64 -d)
+MYSQL_USER=$(printf '%s' '__MYSQL_USER_B64__' | base64 -d)
+MYSQL_PASSWORD=$(printf '%s' '__MYSQL_PASSWORD_B64__' | base64 -d)
+MYSQL_DATABASE=$(printf '%s' '__MYSQL_DB_B64__' | base64 -d)
+JWT_SECRET=$(printf '%s' '__JWT_B64__' | base64 -d)
 
 docker pull $env:DOCKERHUB_REPO_BACKEND:latest
 docker pull $env:DOCKERHUB_REPO_FRONTEND:latest
@@ -112,7 +119,13 @@ docker run -d --name $env:FRONTEND_CONTAINER \
   -p ${env:FRONTEND_PORT}:80 \
   --restart unless-stopped \
   $env:DOCKERHUB_REPO_FRONTEND:latest
-"@
+'@
+
+            $remote = $remote.Replace('__MYSQL_HOST_B64__', $mysqlHostB64)
+            $remote = $remote.Replace('__MYSQL_USER_B64__', $mysqlUserB64)
+            $remote = $remote.Replace('__MYSQL_PASSWORD_B64__', $mysqlPasswordB64)
+            $remote = $remote.Replace('__MYSQL_DB_B64__', $mysqlDbB64)
+            $remote = $remote.Replace('__JWT_B64__', $jwtB64)
 
             ssh -o StrictHostKeyChecking=no -i $env:SSH_KEY "$env:EC2_USER@$env:EC2_HOST" $remote
           '''
