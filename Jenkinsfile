@@ -6,13 +6,9 @@ pipeline {
     disableConcurrentBuilds()
   }
 
-  triggers {
-    githubPush()
-  }
-
   parameters {
     string(name: 'DOCKERHUB_USERNAME', defaultValue: 'yourdockerhubusername', description: 'Docker Hub username/namespace')
-    string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag to publish (example: latest, build-42, v1)')
+    string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag to publish')
     string(name: 'EC2_HOST', defaultValue: 'your-ec2-public-ip', description: 'EC2 public IP or DNS')
     string(name: 'EC2_USER', defaultValue: 'ec2-user', description: 'SSH user for EC2')
     string(name: 'BACKEND_PORT', defaultValue: '5000', description: 'Host port for backend API')
@@ -21,7 +17,6 @@ pipeline {
   }
 
   environment {
-    APP_NAME = 'smart-task-manager'
     BACKEND_CONTAINER = 'stm-backend'
     FRONTEND_CONTAINER = 'stm-frontend'
     DOCKERHUB_REPO_BACKEND = "${params.DOCKERHUB_USERNAME}/smart-task-manager-backend"
@@ -38,26 +33,26 @@ pipeline {
 
     stage('Build Images') {
       steps {
-        sh 'docker --version'
-        script {
-          docker.build("${DOCKERHUB_REPO_BACKEND}:${params.IMAGE_TAG}", "-f backend/Dockerfile backend")
-          docker.build(
-            "${DOCKERHUB_REPO_FRONTEND}:${params.IMAGE_TAG}",
-            "--build-arg VITE_API_URL=${FRONTEND_API_URL} -f frontend/Dockerfile frontend"
-          )
-        }
+        bat 'docker --version'
+        bat "docker build -f backend/Dockerfile -t %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG% backend"
+        bat "docker build --build-arg VITE_API_URL=%FRONTEND_API_URL% -f frontend/Dockerfile -t %DOCKERHUB_REPO_FRONTEND%:%IMAGE_TAG% frontend"
       }
     }
 
     stage('Push Images') {
       steps {
-        script {
-          docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-            docker.image("${DOCKERHUB_REPO_BACKEND}:${params.IMAGE_TAG}").push()
-            docker.image("${DOCKERHUB_REPO_BACKEND}:${params.IMAGE_TAG}").push('latest')
-            docker.image("${DOCKERHUB_REPO_FRONTEND}:${params.IMAGE_TAG}").push()
-            docker.image("${DOCKERHUB_REPO_FRONTEND}:${params.IMAGE_TAG}").push('latest')
-          }
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          bat '''
+            @echo off
+            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+            docker push %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG%
+            docker tag %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG% %DOCKERHUB_REPO_BACKEND%:latest
+            docker push %DOCKERHUB_REPO_BACKEND%:latest
+            docker push %DOCKERHUB_REPO_FRONTEND%:%IMAGE_TAG%
+            docker tag %DOCKERHUB_REPO_FRONTEND%:%IMAGE_TAG% %DOCKERHUB_REPO_FRONTEND%:latest
+            docker push %DOCKERHUB_REPO_FRONTEND%:latest
+            docker logout
+          '''
         }
       }
     }
@@ -69,38 +64,45 @@ pipeline {
       steps {
         withCredentials([
           string(credentialsId: 'mongo-uri', variable: 'MONGO_URI'),
-          string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET')
+          string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
+          sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')
         ]) {
-          sshagent(credentials: ['ec2-ssh-key']) {
-            sh """
-              ssh -o StrictHostKeyChecking=no ${params.EC2_USER}@${params.EC2_HOST} '
-                set -e
-                docker pull ${DOCKERHUB_REPO_BACKEND}:latest
-                docker pull ${DOCKERHUB_REPO_FRONTEND}:latest
+          powershell '''
+            $ErrorActionPreference = "Stop"
 
-                docker network create stm-net || true
+            $mongoB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MONGO_URI))
+            $jwtB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:JWT_SECRET))
 
-                docker rm -f ${BACKEND_CONTAINER} || true
-                docker rm -f ${FRONTEND_CONTAINER} || true
+            $remote = @"
+set -e
+MONGO_URI=$(printf '%s' '$mongoB64' | base64 -d)
+JWT_SECRET=$(printf '%s' '$jwtB64' | base64 -d)
 
-                docker run -d --name ${BACKEND_CONTAINER} \\
-                  --network stm-net \\
-                  -p ${params.BACKEND_PORT}:5000 \\
-                  --restart unless-stopped \\
-                  -e PORT=5000 \\
-                  -e MONGO_URI=\"${MONGO_URI}\" \\
-                  -e JWT_SECRET=\"${JWT_SECRET}\" \\
-                  -e CLIENT_URL=\"http://${params.EC2_HOST}\" \\
-                  ${DOCKERHUB_REPO_BACKEND}:latest
+docker pull $env:DOCKERHUB_REPO_BACKEND:latest
+docker pull $env:DOCKERHUB_REPO_FRONTEND:latest
+docker network create stm-net || true
+docker rm -f $env:BACKEND_CONTAINER || true
+docker rm -f $env:FRONTEND_CONTAINER || true
 
-                docker run -d --name ${FRONTEND_CONTAINER} \\
-                  --network stm-net \\
-                  -p ${params.FRONTEND_PORT}:80 \\
-                  --restart unless-stopped \\
-                  ${DOCKERHUB_REPO_FRONTEND}:latest
-              '
-            """
-          }
+docker run -d --name $env:BACKEND_CONTAINER \
+  --network stm-net \
+  -p ${env:BACKEND_PORT}:5000 \
+  --restart unless-stopped \
+  -e PORT=5000 \
+  -e MONGO_URI="$MONGO_URI" \
+  -e JWT_SECRET="$JWT_SECRET" \
+  -e CLIENT_URL="http://$env:EC2_HOST" \
+  $env:DOCKERHUB_REPO_BACKEND:latest
+
+docker run -d --name $env:FRONTEND_CONTAINER \
+  --network stm-net \
+  -p ${env:FRONTEND_PORT}:80 \
+  --restart unless-stopped \
+  $env:DOCKERHUB_REPO_FRONTEND:latest
+"@
+
+            ssh -o StrictHostKeyChecking=no -i $env:SSH_KEY "$env:EC2_USER@$env:EC2_HOST" $remote
+          '''
         }
       }
     }
@@ -111,7 +113,7 @@ pipeline {
       echo 'Deployment complete. App should be available on EC2.'
     }
     failure {
-      echo 'Pipeline failed. Check Jenkins stage logs.'
+      echo 'Pipeline failed. Check Jenkins logs for failed stage.'
     }
   }
 }
