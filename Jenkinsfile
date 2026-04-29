@@ -106,15 +106,15 @@ MYSQL_PASSWORD=$(printf '%s' '__MYSQL_PASSWORD_B64__' | base64 -d)
 MYSQL_DATABASE=$(printf '%s' '__MYSQL_DB_B64__' | base64 -d)
 JWT_SECRET=$(printf '%s' '__JWT_B64__' | base64 -d)
 
-sudo docker pull ${env:DOCKERHUB_REPO_BACKEND}:latest
-sudo docker pull ${env:DOCKERHUB_REPO_FRONTEND}:latest
+sudo docker pull __REPO_BACKEND__:latest
+sudo docker pull __REPO_FRONTEND__:latest
 sudo docker network create stm-net || true
-sudo docker rm -f $env:BACKEND_CONTAINER || true
-sudo docker rm -f $env:FRONTEND_CONTAINER || true
+sudo docker rm -f __BACKEND_CONTAINER__ || true
+sudo docker rm -f __FRONTEND_CONTAINER__ || true
 
-sudo docker run -d --name $env:BACKEND_CONTAINER \
+sudo docker run -d --name __BACKEND_CONTAINER__ \
   --network stm-net \
-  -p ${env:BACKEND_PORT}:5000 \
+  -p __BACKEND_PORT__:5000 \
   --restart unless-stopped \
   -e PORT=5000 \
   -e MYSQL_HOST="$MYSQL_HOST" \
@@ -123,14 +123,14 @@ sudo docker run -d --name $env:BACKEND_CONTAINER \
   -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
   -e MYSQL_DATABASE="$MYSQL_DATABASE" \
   -e JWT_SECRET="$JWT_SECRET" \
-  -e CLIENT_URL="http://$env:EC2_HOST" \
-  ${env:DOCKERHUB_REPO_BACKEND}:latest
+  -e CLIENT_URL="http://__EC2_HOST__" \
+  __REPO_BACKEND__:latest
 
-sudo docker run -d --name $env:FRONTEND_CONTAINER \
+sudo docker run -d --name __FRONTEND_CONTAINER__ \
   --network stm-net \
-  -p ${env:FRONTEND_PORT}:80 \
+  -p __FRONTEND_PORT__:80 \
   --restart unless-stopped \
-  ${env:DOCKERHUB_REPO_FRONTEND}:latest
+  __REPO_FRONTEND__:latest
 '@
 
             $remote = $remote.Replace('__MYSQL_HOST_B64__', $mysqlHostB64)
@@ -138,6 +138,13 @@ sudo docker run -d --name $env:FRONTEND_CONTAINER \
             $remote = $remote.Replace('__MYSQL_PASSWORD_B64__', $mysqlPasswordB64)
             $remote = $remote.Replace('__MYSQL_DB_B64__', $mysqlDbB64)
             $remote = $remote.Replace('__JWT_B64__', $jwtB64)
+            $remote = $remote.Replace('__REPO_BACKEND__', $env:DOCKERHUB_REPO_BACKEND)
+            $remote = $remote.Replace('__REPO_FRONTEND__', $env:DOCKERHUB_REPO_FRONTEND)
+            $remote = $remote.Replace('__BACKEND_CONTAINER__', $env:BACKEND_CONTAINER)
+            $remote = $remote.Replace('__FRONTEND_CONTAINER__', $env:FRONTEND_CONTAINER)
+            $remote = $remote.Replace('__BACKEND_PORT__', $env:BACKEND_PORT)
+            $remote = $remote.Replace('__FRONTEND_PORT__', $env:FRONTEND_PORT)
+            $remote = $remote.Replace('__EC2_HOST__', $env:EC2_HOST)
 
             $acl = Get-Acl $env:SSH_KEY
             $acl.SetAccessRuleProtection($true, $false)
