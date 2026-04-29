@@ -88,19 +88,31 @@ pipeline {
 
             $remote = @'
 set -e
+if ! command -v docker &> /dev/null
+then
+    echo "Docker not found. Installing..."
+    sudo yum update -y || true
+    sudo yum install -y docker
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    sudo usermod -aG docker ec2-user || true
+fi
+
+sudo systemctl start docker || true
+
 MYSQL_HOST=$(printf '%s' '__MYSQL_HOST_B64__' | base64 -d)
 MYSQL_USER=$(printf '%s' '__MYSQL_USER_B64__' | base64 -d)
 MYSQL_PASSWORD=$(printf '%s' '__MYSQL_PASSWORD_B64__' | base64 -d)
 MYSQL_DATABASE=$(printf '%s' '__MYSQL_DB_B64__' | base64 -d)
 JWT_SECRET=$(printf '%s' '__JWT_B64__' | base64 -d)
 
-docker pull $env:DOCKERHUB_REPO_BACKEND:latest
-docker pull $env:DOCKERHUB_REPO_FRONTEND:latest
-docker network create stm-net || true
-docker rm -f $env:BACKEND_CONTAINER || true
-docker rm -f $env:FRONTEND_CONTAINER || true
+sudo docker pull $env:DOCKERHUB_REPO_BACKEND:latest
+sudo docker pull $env:DOCKERHUB_REPO_FRONTEND:latest
+sudo docker network create stm-net || true
+sudo docker rm -f $env:BACKEND_CONTAINER || true
+sudo docker rm -f $env:FRONTEND_CONTAINER || true
 
-docker run -d --name $env:BACKEND_CONTAINER \
+sudo docker run -d --name $env:BACKEND_CONTAINER \
   --network stm-net \
   -p ${env:BACKEND_PORT}:5000 \
   --restart unless-stopped \
@@ -114,7 +126,7 @@ docker run -d --name $env:BACKEND_CONTAINER \
   -e CLIENT_URL="http://$env:EC2_HOST" \
   $env:DOCKERHUB_REPO_BACKEND:latest
 
-docker run -d --name $env:FRONTEND_CONTAINER \
+sudo docker run -d --name $env:FRONTEND_CONTAINER \
   --network stm-net \
   -p ${env:FRONTEND_PORT}:80 \
   --restart unless-stopped \
