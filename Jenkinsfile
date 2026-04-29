@@ -127,8 +127,12 @@ docker run -d --name $env:FRONTEND_CONTAINER \
             $remote = $remote.Replace('__MYSQL_DB_B64__', $mysqlDbB64)
             $remote = $remote.Replace('__JWT_B64__', $jwtB64)
 
-            icacls $env:SSH_KEY /inheritance:r | Out-Null
-            icacls $env:SSH_KEY /grant:r "$($env:USERNAME):(R)" | Out-Null
+            $acl = Get-Acl $env:SSH_KEY
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) | Out-Null }
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule([System.Security.Principal.WindowsIdentity]::GetCurrent().Name, "Read", "Allow")
+            $acl.AddAccessRule($rule)
+            Set-Acl -Path $env:SSH_KEY -AclObject $acl
 
             ssh -o StrictHostKeyChecking=no -i $env:SSH_KEY "$env:EC2_USER@$env:EC2_HOST" $remote
           '''
