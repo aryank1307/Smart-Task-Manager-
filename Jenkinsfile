@@ -127,6 +127,9 @@ docker run -d --name $env:FRONTEND_CONTAINER \
             $remote = $remote.Replace('__MYSQL_DB_B64__', $mysqlDbB64)
             $remote = $remote.Replace('__JWT_B64__', $jwtB64)
 
+            icacls $env:SSH_KEY /inheritance:r | Out-Null
+            icacls $env:SSH_KEY /grant:r "$($env:USERNAME):(R)" | Out-Null
+
             ssh -o StrictHostKeyChecking=no -i $env:SSH_KEY "$env:EC2_USER@$env:EC2_HOST" $remote
           '''
         }
