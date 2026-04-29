@@ -44,7 +44,7 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
           bat '''
             @echo off
-            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+            echo %DOCKER_PASS%| docker login -u %DOCKER_USER% --password-stdin
             if errorlevel 1 exit /b %errorlevel%
             docker push %DOCKERHUB_REPO_BACKEND%:%IMAGE_TAG%
             if errorlevel 1 exit /b %errorlevel%
