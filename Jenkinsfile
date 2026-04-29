@@ -7,9 +7,9 @@ pipeline {
   }
 
   parameters {
-    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'yourdockerhubusername', description: 'Docker Hub username/namespace')
+    string(name: 'DOCKERHUB_USERNAME', defaultValue: 'hellfire13', description: 'Docker Hub username/namespace')
     string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Image tag to publish')
-    string(name: 'EC2_HOST', defaultValue: 'your-ec2-public-ip', description: 'EC2 public IP or DNS')
+    string(name: 'EC2_HOST', defaultValue: '15.206.70.62', description: 'EC2 public IP or DNS')
     string(name: 'EC2_USER', defaultValue: 'ec2-user', description: 'SSH user for EC2')
     string(name: 'BACKEND_PORT', defaultValue: '5000', description: 'Host port for backend API')
     string(name: 'FRONTEND_PORT', defaultValue: '80', description: 'Host port for frontend')
