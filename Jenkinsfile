@@ -106,8 +106,8 @@ MYSQL_PASSWORD=$(printf '%s' '__MYSQL_PASSWORD_B64__' | base64 -d)
 MYSQL_DATABASE=$(printf '%s' '__MYSQL_DB_B64__' | base64 -d)
 JWT_SECRET=$(printf '%s' '__JWT_B64__' | base64 -d)
 
-sudo docker pull $env:DOCKERHUB_REPO_BACKEND:latest
-sudo docker pull $env:DOCKERHUB_REPO_FRONTEND:latest
+sudo docker pull ${env:DOCKERHUB_REPO_BACKEND}:latest
+sudo docker pull ${env:DOCKERHUB_REPO_FRONTEND}:latest
 sudo docker network create stm-net || true
 sudo docker rm -f $env:BACKEND_CONTAINER || true
 sudo docker rm -f $env:FRONTEND_CONTAINER || true
@@ -124,13 +124,13 @@ sudo docker run -d --name $env:BACKEND_CONTAINER \
   -e MYSQL_DATABASE="$MYSQL_DATABASE" \
   -e JWT_SECRET="$JWT_SECRET" \
   -e CLIENT_URL="http://$env:EC2_HOST" \
-  $env:DOCKERHUB_REPO_BACKEND:latest
+  ${env:DOCKERHUB_REPO_BACKEND}:latest
 
 sudo docker run -d --name $env:FRONTEND_CONTAINER \
   --network stm-net \
   -p ${env:FRONTEND_PORT}:80 \
   --restart unless-stopped \
-  $env:DOCKERHUB_REPO_FRONTEND:latest
+  ${env:DOCKERHUB_REPO_FRONTEND}:latest
 '@
 
             $remote = $remote.Replace('__MYSQL_HOST_B64__', $mysqlHostB64)
