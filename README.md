@@ -1,11 +1,11 @@
 # Smart Task Manager
 
-Full-stack task manager with auth, task CRUD, priorities, and deadlines, plus CI/CD auto-deploy to AWS EC2.
+Full-stack task manager with auth, task CRUD, priorities, deadlines, and CI/CD deployment to AWS EC2.
 
 ## Tech Stack
 - Frontend: React (Vite + Nginx)
 - Backend: Node.js + Express + JWT
-- Database: MongoDB
+- Database: MySQL
 - DevOps: GitHub -> Jenkins -> Docker -> AWS EC2
 
 ## Features
@@ -13,29 +13,29 @@ Full-stack task manager with auth, task CRUD, priorities, and deadlines, plus CI
 - Create / Update / Delete tasks
 - Set priority (`Low`, `Medium`, `High`)
 - Set deadline
-- Per-user protected task API
+- Protected task APIs per user
 
 ## Project Structure
 - `frontend/` React app
-- `backend/` Express API
-- `docker-compose.yml` local stack (frontend + backend + MongoDB)
+- `backend/` Express API (MySQL)
+- `docker-compose.yml` local stack (frontend + backend + MySQL)
 - `Jenkinsfile` CI/CD pipeline for EC2 deployment
 
-## Run Locally (One Command)
+## Local Run
 ```bash
 docker compose up --build -d
 ```
 
 App URLs:
 - Frontend: `http://localhost:3000`
-- Backend: `http://localhost:5000/api/health`
+- Backend health: `http://localhost:5000/api/health`
 
 Stop:
 ```bash
 docker compose down
 ```
 
-API smoke test:
+Smoke test:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
@@ -46,26 +46,31 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 
 Local backend defaults:
 - `PORT=5000`
-- `MONGO_URI=mongodb://mongo:27017/smart_task_manager`
+- `MYSQL_HOST=mysql`
+- `MYSQL_PORT=3306`
+- `MYSQL_USER=stm_user`
+- `MYSQL_PASSWORD=stm_password`
+- `MYSQL_DATABASE=smart_task_manager`
 - `JWT_SECRET=replace_with_strong_secret`
 - `CLIENT_URL=http://localhost:3000`
 
 ## Jenkins CI/CD (Auto Deploy)
 ### Flow
 1. Push code to GitHub.
-2. GitHub webhook triggers Jenkins job.
-3. Jenkins builds backend + frontend Docker images.
-4. Jenkins pushes both images to Docker Hub.
-5. Jenkins deploys containers on EC2 via SSH.
+2. Jenkins pulls repo and builds backend + frontend images.
+3. Jenkins pushes both images to Docker Hub.
+4. Jenkins SSH deploys latest images to EC2.
 
 ### Jenkins Credentials Required
 - `dockerhub-creds` (Username/Password)
-- `ec2-ssh-key` (SSH private key for EC2)
-- `mongo-uri` (Secret text, production MongoDB URI)
-- `jwt-secret` (Secret text, JWT secret)
+- `ec2-ssh-key` (SSH Username with private key)
+- `jwt-secret` (Secret text)
+- `mysql-host` (Secret text, e.g. RDS endpoint)
+- `mysql-user` (Secret text)
+- `mysql-password` (Secret text)
+- `mysql-database` (Secret text)
 
-### Update Jenkinsfile Values
-No code edit required. Use Jenkins job parameters:
+### Build Parameters
 - `DOCKERHUB_USERNAME`
 - `IMAGE_TAG`
 - `EC2_HOST`
@@ -75,34 +80,17 @@ No code edit required. Use Jenkins job parameters:
 - `DEPLOY_TO_EC2`
 
 ### EC2 Requirements
-- Docker installed
+- Docker installed and running
 - Security group open:
+  - `22` (SSH)
   - `80` (frontend)
   - `5000` (backend API)
-  - `22` (SSH for Jenkins)
+- Backend can reach your MySQL server (RDS or MySQL host) on port `3306`
 
-Optional EC2 bootstrap script:
+Optional EC2 bootstrap:
 ```bash
 bash deploy/ec2-bootstrap.sh
 ```
-
-## One-Time Setup Commands
-### 1) Push project to GitHub
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\push-to-github.ps1 -RemoteUrl "https://github.com/<owner>/<repo>.git"
-```
-
-### 2) Create GitHub webhook (optional via CLI)
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\create-github-webhook.ps1 `
-  -Owner "<owner>" `
-  -Repo "<repo>" `
-  -JenkinsWebhookUrl "http://<jenkins-host>/github-webhook/"
-```
-
-### 3) Jenkins configuration checklist
-See:
-- `scripts/jenkins-setup-checklist.md`
 
 ## API Endpoints
 - `POST /api/auth/register`

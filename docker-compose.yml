@@ -1,12 +1,15 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: stm-mongo
+  mysql:
+    image: mysql:8.4
+    container_name: stm-mysql
     restart: always
-    ports:
-      - "27017:27017"
+    environment:
+      MYSQL_DATABASE: smart_task_manager
+      MYSQL_USER: stm_user
+      MYSQL_PASSWORD: stm_password
+      MYSQL_ROOT_PASSWORD: rootpassword
     volumes:
-      - mongo_data:/data/db
+      - mysql_data:/var/lib/mysql
 
   backend:
     build: ./backend
@@ -17,7 +20,7 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - mongo
+      - mysql
 
   frontend:
     build:
@@ -32,4 +35,4 @@ services:
       - backend
 
 volumes:
-  mongo_data:
+  mysql_data:

@@ -18,8 +18,11 @@
 ## 3) Add Credentials
 - `dockerhub-creds` (Username with password)
 - `ec2-ssh-key` (SSH Username with private key)
-- `mongo-uri` (Secret text)
 - `jwt-secret` (Secret text)
+- `mysql-host` (Secret text)
+- `mysql-user` (Secret text)
+- `mysql-password` (Secret text)
+- `mysql-database` (Secret text)
 
 ## 4) Job Parameters to Fill at First Run
 - `DOCKERHUB_USERNAME`
@@ -39,6 +42,7 @@
 - Docker installed and running
 - Ports open in Security Group: `22`, `80`, `5000`
 - Jenkins SSH key authorized in `~/.ssh/authorized_keys`
+- Backend host can reach MySQL on port `3306`
 
 ## 7) Validate
 - Push code to `main`

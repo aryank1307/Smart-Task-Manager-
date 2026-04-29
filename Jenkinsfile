@@ -63,19 +63,28 @@ pipeline {
       }
       steps {
         withCredentials([
-          string(credentialsId: 'mongo-uri', variable: 'MONGO_URI'),
+          string(credentialsId: 'mysql-host', variable: 'MYSQL_HOST'),
+          string(credentialsId: 'mysql-user', variable: 'MYSQL_USER'),
+          string(credentialsId: 'mysql-password', variable: 'MYSQL_PASSWORD'),
+          string(credentialsId: 'mysql-database', variable: 'MYSQL_DATABASE'),
           string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET'),
           sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')
         ]) {
           powershell '''
             $ErrorActionPreference = "Stop"
 
-            $mongoB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MONGO_URI))
+            $mysqlHostB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MYSQL_HOST))
+            $mysqlUserB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MYSQL_USER))
+            $mysqlPasswordB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MYSQL_PASSWORD))
+            $mysqlDbB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:MYSQL_DATABASE))
             $jwtB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:JWT_SECRET))
 
             $remote = @"
 set -e
-MONGO_URI=$(printf '%s' '$mongoB64' | base64 -d)
+MYSQL_HOST=$(printf '%s' '$mysqlHostB64' | base64 -d)
+MYSQL_USER=$(printf '%s' '$mysqlUserB64' | base64 -d)
+MYSQL_PASSWORD=$(printf '%s' '$mysqlPasswordB64' | base64 -d)
+MYSQL_DATABASE=$(printf '%s' '$mysqlDbB64' | base64 -d)
 JWT_SECRET=$(printf '%s' '$jwtB64' | base64 -d)
 
 docker pull $env:DOCKERHUB_REPO_BACKEND:latest
@@ -89,7 +98,11 @@ docker run -d --name $env:BACKEND_CONTAINER \
   -p ${env:BACKEND_PORT}:5000 \
   --restart unless-stopped \
   -e PORT=5000 \
-  -e MONGO_URI="$MONGO_URI" \
+  -e MYSQL_HOST="$MYSQL_HOST" \
+  -e MYSQL_PORT=3306 \
+  -e MYSQL_USER="$MYSQL_USER" \
+  -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+  -e MYSQL_DATABASE="$MYSQL_DATABASE" \
   -e JWT_SECRET="$JWT_SECRET" \
   -e CLIENT_URL="http://$env:EC2_HOST" \
   $env:DOCKERHUB_REPO_BACKEND:latest
