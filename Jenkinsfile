@@ -21,7 +21,7 @@ pipeline {
     FRONTEND_CONTAINER = 'stm-frontend'
     DOCKERHUB_REPO_BACKEND = "${params.DOCKERHUB_USERNAME}/smart-task-manager-backend"
     DOCKERHUB_REPO_FRONTEND = "${params.DOCKERHUB_USERNAME}/smart-task-manager-frontend"
-    FRONTEND_API_URL = "http://${params.EC2_HOST}:${params.BACKEND_PORT}/api"
+    FRONTEND_API_URL = "/api"
   }
 
   stages {
@@ -111,6 +111,15 @@ sudo docker pull __REPO_FRONTEND__:latest
 sudo docker network create stm-net || true
 sudo docker rm -f __BACKEND_CONTAINER__ || true
 sudo docker rm -f __FRONTEND_CONTAINER__ || true
+sudo docker rm -f mysql || true
+
+sudo docker run -d --name mysql \
+  --network stm-net \
+  -e MYSQL_ROOT_PASSWORD="$MYSQL_PASSWORD" \
+  -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+  -e MYSQL_USER="$MYSQL_USER" \
+  -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+  mysql:8.0
 
 sudo docker run -d --name __BACKEND_CONTAINER__ \
   --network stm-net \

@@ -3,7 +3,7 @@ import AuthForm from './components/AuthForm';
 import TaskManager from './components/TaskManager';
 import './styles.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
